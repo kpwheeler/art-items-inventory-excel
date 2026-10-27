@@ -55,7 +55,7 @@ interface ItemForm {
   fields(): Fields;
 }
 
-function buildForm(c: Category, values: Fields, onSubmit: (action: string) => void, actions: [string, string][]): ItemForm {
+function buildForm(c: Category, values: Fields, onSubmit: (action: string) => Promise<void>, actions: [string, string][]): ItemForm {
   const headers = wb.table(c).headers.filter((col) => !AUTO_COLUMNS.includes(col));
   const inputs = new Map<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>();
   const status = h('span', { className: 'muted' });
@@ -121,10 +121,21 @@ function buildForm(c: Category, values: Fields, onSubmit: (action: string) => vo
     h('div', { className: 'actions' },
       ...actions.map(([action, label], i) =>
         h('button', { type: 'submit', value: action, className: i === 0 ? 'primary' : '' }, label))));
+  let saving = false;
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
+    if (saving) return;   // one save at a time, however often the button is pressed
+    saving = true;
     const submitter = (ev as SubmitEvent).submitter as HTMLButtonElement | null;
-    onSubmit(submitter?.value ?? actions[0][0]);
+    const buttons = form.querySelectorAll<HTMLButtonElement>('.actions button');
+    const label = submitter?.textContent ?? '';
+    buttons.forEach((b) => { b.disabled = true; });
+    if (submitter) submitter.textContent = 'Saving…';
+    void onSubmit(submitter?.value ?? actions[0][0]).finally(() => {
+      saving = false;
+      buttons.forEach((b) => { b.disabled = false; });
+      if (submitter) submitter.textContent = label;
+    });
   });
 
   return {
@@ -169,7 +180,7 @@ function categoryPicker(selected: Category | undefined, onChange: (c: Category) 
 }
 
 function showAdd(c: Category = wb.categories[0], keep: Fields = {}, note?: HTMLElement): void {
-  const form = buildForm(c, keep, (action) => void save(action), [
+  const form = buildForm(c, keep, (action) => save(action), [
     ['save', 'Save'], ['again', 'Save & add another'],
   ]);
   const save = async (action: string) => {
@@ -203,7 +214,7 @@ function showEdit(item: Item, note?: HTMLElement): void {
   const values: Fields = {};
   for (const col of t.headers) values[col] = wb.value(item, col);
 
-  const form = buildForm(item.category, values, (action) => void save(action, false), [['save', 'Save changes']]);
+  const form = buildForm(item.category, values, (action) => save(action, false), [['save', 'Save changes']]);
   const save = async (_action: string, force: boolean) => {
     try {
       await wb.updateItem(item, form.fields(), force);

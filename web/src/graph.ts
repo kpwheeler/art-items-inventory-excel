@@ -28,19 +28,62 @@ export function setWorkbookPath(path: string): void {
   base = `https://graph.microsoft.com/v1.0/me/drive/root:${encodeURI(p)}:/workbook`;
 }
 
-async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
-  const token = await getToken();
-  const res = await fetch(base + url, {
-    method,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!res.ok) {
+// One Excel session for all requests: the workbook is opened once instead of on every call,
+// which is faster and avoids most "workbook cannot be opened" timeouts.
+let session: string | null = null;
+
+const RETRY_STATUSES = [429, 502, 503, 504];
+const MAX_ATTEMPTS = 4;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function send(method: string, url: string, body: unknown, withSession: boolean): Promise<Response> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${await getToken()}`,
+    'Content-Type': 'application/json',
+  };
+  if (withSession && session) headers['workbook-session-id'] = session;
+  return fetch(base + url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+}
+
+/**
+ * Sends a request, retrying timeouts and throttling. `retry` must be false for requests
+ * that are not safe to repeat (adding or deleting rows): those fail instead, and the
+ * caller checks what happened.
+ */
+async function call<T>(method: string, url: string, body?: unknown, retry = method !== 'POST'): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    if (!session) await openSession();
+    const res = await send(method, url, body, true);
+    if (res.ok) {
+      const type = res.headers.get('content-type') ?? '';
+      return (type.includes('json') ? await res.json() : undefined) as T;
+    }
     const text = await res.text();
+    if (/session/i.test(text) && [400, 404].includes(res.status) && attempt < MAX_ATTEMPTS) {
+      session = null;   // expired after a few idle minutes; open a new one and try again
+      continue;
+    }
+    if (retry && RETRY_STATUSES.includes(res.status) && attempt < MAX_ATTEMPTS) {
+      const after = Number(res.headers.get('retry-after'));
+      await sleep(after > 0 ? after * 1000 : 2000 * attempt);
+      continue;
+    }
     throw new GraphError(res.status, text.slice(0, 300));
   }
-  const type = res.headers.get('content-type') ?? '';
-  return (type.includes('json') ? await res.json() : undefined) as T;
+}
+
+async function openSession(): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    const res = await send('POST', '/createSession', { persistChanges: true }, false);
+    if (res.ok) {
+      session = ((await res.json()) as { id: string }).id;
+      return;
+    }
+    if (!RETRY_STATUSES.includes(res.status) || attempt >= MAX_ATTEMPTS) {
+      throw new GraphError(res.status, (await res.text()).slice(0, 300));
+    }
+    await sleep(3000 * attempt);
+  }
 }
 
 /** "Art!A1:AA3" or "'ISBN Lookup'!A1:G2" -> parts. */

@@ -171,7 +171,14 @@ export class Workbook {
       if (h === 'Last Updated') return nowStamp();
       return toCell(h, fields[h] ?? '');
     });
-    await this.append(c, row);
+    try {
+      await this.append(c, row);
+    } catch (e) {
+      // A timed-out add can still have gone through; look before reporting a failure.
+      await this.reload(c);
+      if (this.find(itemNo)) return itemNo;
+      throw e;
+    }
     await this.reload(c);
     return itemNo;
   }
