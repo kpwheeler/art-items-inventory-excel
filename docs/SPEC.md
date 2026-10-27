@@ -1,7 +1,8 @@
 # Collection Inventory App (Excel) — Proposal & Specification
 
-Approved 2026-10-27. Source document: Claude Doc "Collection Inventory App (Excel) — Proposal & Specification".
-Implementation notes at the end record where the build differs from the original wording.
+Approved 2026-10-27; updated 2026-10-27 after the first build and test. Source document: Claude Doc
+"Collection Inventory App (Excel) — Proposal & Specification". Implementation notes at the end record
+where the build differs from the original wording.
 
 ## Summary
 
@@ -29,7 +30,9 @@ The workbook is the database; the web form and Excel are two windows onto the sa
 
 ## Workbook design
 
-`Collection Inventory.xlsx` lives in OneDrive and holds one Excel Table per category tab. Every
+`Collection Inventory.xlsx` lives in OneDrive at **Inventory/Collection Inventory.xlsx** (a top-level
+folder named Inventory, which also holds reference copies of this specification and the setup guide)
+and holds one Excel Table per category tab. Every
 category table starts with the same shared columns, in the same order, followed by its own columns.
 
 ### Worksheet tabs
@@ -83,19 +86,42 @@ form reads the same lists from `tblDropdowns`.
 ## Web form
 
 1. **Sign in** with the Microsoft account that owns the OneDrive workbook. The page keeps no passwords or keys.
-2. **Pick a category.** Categories come from `tblCategories`; the fields shown come from that table's headers.
+2. **Choose the Category** from the pull-down that is the first field of the form. Categories come from `tblCategories`; the fields shown come from that table's headers. Switching category while adding keeps what was typed in the shared fields.
 3. **Books: enter or scan the ISBN**, then Look up. Only empty fields are filled; unknown ISBNs show "Not found". Scanning uses the camera through a JavaScript barcode library (ZXing) and works in Chrome on Windows (webcam) and iPhone; no image is stored.
 4. **Fill in what you know and Save.** The form assigns the next item number, sets Entered Via and Last Updated, and adds the row to the right tab.
 5. **Find and edit.** Search lists matching items from all tabs; open one to change it and save it back to the same row.
+
+6. **Check duplicates** (menu) lists items that may have been entered more than once (see below).
+7. **Close** (menu, right end) ends the session: it releases the workbook in Excel and shows "Finished" with an Open again button. Chrome usually doesn't let a page close its own tab, so the tab is closed by hand. It does not sign out.
 
 Details: Save & add another keeps category and acquisition fields; Units defaults to inches; target
 browser is Google Chrome on Windows and iPhone (Share › Add to Home Screen for an icon); hosted free
 on GitHub Pages as a static site; if a row changed in Excel since it was opened, the form asks
 before overwriting.
 
+Reliability: the form opens one Excel session and reuses it for every request (reopening it when it
+expires), because opening the workbook afresh on each request caused "workbook cannot be opened"
+timeouts (HTTP 504). Timeouts and throttling (429/502/503/504) are retried automatically for requests
+that are safe to repeat. Adding a row is never retried blindly: after a failed add the form checks
+whether the row arrived. While saving, the buttons show "Saving…" and further clicks are ignored.
+
+### Check duplicates
+
+Re-reads every category tab and groups items that may be the same thing entered twice, across
+categories:
+
+| Group | Matched on |
+| --- | --- |
+| Likely | Same Item No; same ISBN (hyphens and spaces ignored); same Serial Number; same Name ignoring capitals, punctuation and a leading "The", "A" or "An" |
+| Possible | Very similar names (letter-pair similarity of 85% or more), e.g. "Paper Koi Sculpture" and "Paper Koi Sculptures" |
+
+Each item shows its number, category, creator, location, acquired date and Entered Via, with **Open**
+(compare and edit) and **Delete** (after a confirmation; OneDrive version history can undo; the last
+row of a table is cleared instead of deleted, because a table keeps one row).
+
 ### Moving items between categories
 
-- **Web form:** open the item › Move to category. The row moves to that tab with all shared fields, gets the next number in the new prefix, and Notes records "Moved from MSC-0004 on <date>".
+- **Web form:** on an item's page, choose a different Category in the pull-down and confirm. The row moves to that tab with all shared fields, gets the next number in the new prefix, and Notes records "Moved from MSC-0004 on <date>". Unsaved edits on the page are not carried over.
 - **Excel:** cut the row, paste it at the bottom of the target table, clear Item No; Tidy workbook assigns the new number.
 - **Renaming Misc itself** is a tab rename plus a change to its row in `tblCategories`; existing numbers keep the `MSC` prefix.
 
@@ -134,7 +160,7 @@ OneDrive; the form reaches it only after sign-in (Graph scope `Files.ReadWrite`)
 | --- | --- |
 | Microsoft 365 (already owned) | $0 extra |
 | GitHub Pages hosting (public repository) | $0 |
-| Microsoft app registration | $0 |
+| Microsoft app registration (needs a free Azure account, see Decisions) | $0 |
 | Open Library | $0 |
 
 ## Decisions
@@ -148,14 +174,17 @@ OneDrive; the form reaches it only after sign-in (Graph scope `Files.ReadWrite`)
 | Who enters items | Just the owner |
 | Barcode scanning | Yes, Phase 2 |
 | Currency and units | USD, inches |
-| GitHub repository | `kpwheeler/art-items-inventory-excel` |
+| GitHub repository | `kpwheeler/art-items-inventory-excel` (public) |
+| Workbook location | OneDrive › Inventory › Collection Inventory.xlsx |
+| App registration | A personal Microsoft account has no Microsoft Entra directory, so a free Azure account was created to get one. App "Collection Inventory", personal accounts, SPA redirect `https://kpwheeler.github.io/art-items-inventory-excel/`, Graph `Files.ReadWrite` |
+| Target browser | Google Chrome on Windows and iPhone |
 
 ## Roadmap
 
-1. **Phase 0 — Check.** Confirm the form can write to an Excel table in a personal OneDrive. Fallback: Microsoft Forms into one sheet.
-2. **Phase 1 — Workbook.** Tabs, tables, lists and dropdowns, next-number formulas, Search sheet, Power Query ISBN lookup, `_Template`, How-to.
-3. **Phase 2 — Web form.** Sign-in, dynamic categories and fields, ISBN lookup and scan, save with numbering, search and edit, move to category.
-4. **Phase 3 — Polish.** Tidy workbook, change warnings, Google Books as a second ISBN source, printable inventory report.
+1. **Phase 0 — Check.** Confirm the form can write to an Excel table in a personal OneDrive. Fallback: Microsoft Forms into one sheet. *Status: sign-in and opening the workbook work; the first save timed out, which led to the session-and-retry change; saving to be re-tested.*
+2. **Phase 1 — Workbook.** Tabs, tables, lists and dropdowns, next-number formulas, Search sheet, Power Query ISBN lookup, `_Template`, How-to. *Status: built and tested in desktop Excel.*
+3. **Phase 2 — Web form.** Sign-in, dynamic categories and fields, Category pull-down, ISBN lookup and scan, save with numbering, search and edit, move by changing category, Close. *Status: built and deployed; being tested.*
+4. **Phase 3 — Polish.** Tidy workbook, change warnings, check duplicates, Google Books as a second ISBN source, printable inventory report. *Status: the first three built early; the last two not started.*
 
 ## Implementation notes (differences from the original wording)
 
@@ -168,3 +197,8 @@ OneDrive; the form reaches it only after sign-in (Graph scope `Files.ReadWrite`)
   workbook copies them into blank Books cells.
 - **Lists tab adds `tblDropdowns`** (column → list) so the form offers exactly the sheet's dropdowns.
 - **Tidy workbook and change warnings** (Phase 3 items) were built early, with the form.
+- **Workbook moved to OneDrive › Inventory** instead of Documents, at the owner's request.
+- **Category is a pull-down at the top of the form**, and moving an item is done by changing it,
+  replacing the separate "Move to category" control.
+- **Added after the spec:** the Close button, the Check duplicates page, and the single Excel session
+  with automatic retries (fix for HTTP 504 "workbook cannot be opened" on save).
