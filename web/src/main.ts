@@ -312,6 +312,56 @@ function showTidy(): void {
     run, log);
 }
 
+async function showDuplicates(note?: HTMLElement): Promise<void> {
+  show(note ?? null, h('h2', {}, 'Check duplicates'), message('Reading every category tab…'));
+  try {
+    await wb.refresh();
+  } catch (e) {
+    show(message(`Could not read the workbook: ${errorText(e)}`, 'error'));
+    return;
+  }
+  const groups = wb.duplicates();
+  const likely = groups.filter((g) => g.strength === 'likely').length;
+
+  const row = (it: Item) => {
+    const details = [wb.value(it, 'Item No'), it.category.name, wb.value(it, 'Creator'),
+      wb.value(it, 'Location'), wb.value(it, 'Acquired Date'), wb.value(it, 'Entered Via')]
+      .filter(Boolean).join(' · ');
+    return h('li', { className: 'dup-item' },
+      h('div', {}, h('strong', {}, wb.value(it, 'Name') || '(no name)'), h('div', { className: 'muted' }, details)),
+      h('div', { className: 'inline' },
+        h('button', { type: 'button', onclick: () => showEdit(it) }, 'Open'),
+        h('button', {
+          type: 'button',
+          className: 'danger',
+          onclick: async () => {
+            const label = `${wb.value(it, 'Item No') || '(no number)'} "${wb.value(it, 'Name')}"`;
+            if (!confirm(`Delete ${label} from the ${it.category.tab} tab? `
+              + 'Use OneDrive version history to undo if needed.')) return;
+            try {
+              await wb.deleteItem(it);
+              await showDuplicates(message(`Deleted ${label}.`, 'ok'));
+            } catch (e) {
+              await showDuplicates(message(`Not deleted: ${errorText(e)}`, 'error'));
+            }
+          },
+        }, 'Delete')));
+  };
+
+  show(note ?? null,
+    h('div', { className: 'bar' }, h('h2', {}, 'Check duplicates'),
+      h('button', { type: 'button', onclick: () => void showDuplicates() }, 'Check again')),
+    h('p', { className: 'muted' },
+      'Looks across all categories for the same item number, ISBN, serial number or name, and for very similar names. '
+      + 'Open each one to compare; delete only the extra copy.'),
+    groups.length === 0
+      ? message(`No duplicates found among ${wb.items().length} item(s).`, 'ok')
+      : message(`${groups.length} group(s) to review: ${likely} likely, ${groups.length - likely} possible.`, 'info'),
+    ...groups.map((g) => h('section', { className: `dup ${g.strength}` },
+      h('h3', {}, `${g.strength === 'likely' ? 'Likely' : 'Possible'}: ${g.reason}`),
+      h('ul', { className: 'results' }, ...g.items.map(row)))));
+}
+
 async function closeApp(): Promise<void> {
   if (main.querySelector('form.item') && !confirm('Close the inventory? Anything not saved on this page is lost.')) return;
   nav.hidden = true;
@@ -367,6 +417,7 @@ async function start(): Promise<void> {
       if (b.dataset.view === 'add') showAdd();
       else if (b.dataset.view === 'search') showSearch();
       else if (b.dataset.view === 'close') void closeApp();
+      else if (b.dataset.view === 'duplicates') void showDuplicates();
       else showTidy();
     };
   });

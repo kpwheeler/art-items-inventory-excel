@@ -60,6 +60,14 @@ form.item label.category select { font-weight: 600; }
 .msg.ok, .log .ok { color: var(--ok); }
 .msg.error, .log .error { color: var(--error); }
 
+nav { flex-wrap: wrap; }
+button.danger { color: var(--error); border-color: var(--error); }
+.dup { margin: 16px 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.dup.likely { border-left: 4px solid var(--error); }
+.dup.possible { border-left: 4px solid var(--muted); }
+.dup h3 { font-size: 1rem; margin: 4px 0; }
+.dup-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+
 .results, .log { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 8px; }
 .result { width: 100%; text-align: left; display: grid; gap: 2px; }
 

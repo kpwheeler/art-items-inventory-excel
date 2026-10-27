@@ -2,7 +2,7 @@
 // add / edit / move / tidy operations the form performs on them.
 import * as g from './graph';
 import type { Cell, TableData } from './graph';
-import { bookFields, lookupIsbn } from './isbn';
+import { bookFields, cleanIsbn, lookupIsbn } from './isbn';
 
 export interface Category {
   name: string;
@@ -26,6 +26,87 @@ export const NUMBER_COLUMNS = ['Purchase Price', 'Estimated Value', 'Pages'];
 export const LONG_COLUMNS = ['Description', 'Notes'];
 const SEARCH_COLUMNS = ['Item No', 'Name', 'Creator', 'Description', 'Acquired From Name', 'Location', 'Tags', 'Notes'];
 const BOOK_COLUMNS = ['Name', 'Creator', 'Author', 'Publisher', 'Publication Year', 'Pages'];
+
+export interface DuplicateGroup {
+  /** Why the items were grouped, e.g. "Same ISBN 9780140268867". */
+  reason: string;
+  /** "likely" for identical identifiers or names, "possible" for similar names. */
+  strength: 'likely' | 'possible';
+  items: Item[];
+}
+
+/** Lower-case letters and digits only, without a leading "the", "a" or "an". */
+export function normalizeName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/^(the|a|an) /, '');
+}
+
+function bigrams(s: string): Set<string> {
+  const t = s.replace(/ /g, '');
+  const out = new Set<string>();
+  for (let i = 0; i < t.length - 1; i++) out.add(t.slice(i, i + 2));
+  return out;
+}
+
+/** Dice similarity of two letter-pair sets: 1 = same letters in the same pairs, 0 = nothing shared. */
+function similarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let shared = 0;
+  for (const x of a) if (b.has(x)) shared++;
+  return (2 * shared) / (a.size + b.size);
+}
+
+const SIMILAR_NAME = 0.85;
+
+/**
+ * Groups items that look like the same thing entered twice: identical item number,
+ * ISBN or serial number, identical names (ignoring case, punctuation and a leading
+ * "The"), and very similar names. Pure function so it can be tested without Excel.
+ */
+export function findDuplicates(items: Item[], valueOf: (item: Item, column: string) => string): DuplicateGroup[] {
+  const groups: DuplicateGroup[] = [];
+  const byKey = (column: string, label: string, clean: (v: string) => string) => {
+    const map = new Map<string, Item[]>();
+    for (const it of items) {
+      const key = clean(valueOf(it, column));
+      if (key) map.set(key, [...(map.get(key) ?? []), it]);
+    }
+    for (const [key, list] of map) {
+      if (list.length > 1) groups.push({ reason: `${label} ${key}`, strength: 'likely', items: list });
+    }
+  };
+  byKey('Item No', 'Same item number', (v) => v.trim().toUpperCase());
+  byKey('ISBN', 'Same ISBN', cleanIsbn);
+  byKey('Serial Number', 'Same serial number', (v) => v.trim().toUpperCase());
+
+  // Names: identical after normalizing, then very similar.
+  const named = items
+    .map((it) => ({ it, name: normalizeName(valueOf(it, 'Name')) }))
+    .filter((x) => x.name.length >= 3);
+  const sameName = new Map<string, Item[]>();
+  for (const x of named) sameName.set(x.name, [...(sameName.get(x.name) ?? []), x.it]);
+  for (const list of sameName.values()) {
+    if (list.length > 1) {
+      groups.push({ reason: `Same name "${valueOf(list[0], 'Name')}"`, strength: 'likely', items: list });
+    }
+  }
+
+  const names = [...sameName.keys()].filter((n) => n.length >= 5);
+  const pairs = names.map((n) => bigrams(n));
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      if (similarity(pairs[i], pairs[j]) >= SIMILAR_NAME) {
+        const a = sameName.get(names[i]) ?? [];
+        const b = sameName.get(names[j]) ?? [];
+        groups.push({
+          reason: `Similar names "${valueOf(a[0], 'Name')}" and "${valueOf(b[0], 'Name')}"`,
+          strength: 'possible',
+          items: [...a, ...b],
+        });
+      }
+    }
+  }
+  return groups;
+}
 
 /** Thrown when a row was changed in Excel after the form loaded it. */
 export class ChangedError extends Error {
@@ -218,6 +299,25 @@ export class Workbook {
     await g.deleteRow(src, item.index);
     await Promise.all([this.reload(target), this.reload(item.category)]);
     return itemNo;
+  }
+
+  /** Re-reads every category table, e.g. to pick up rows typed in Excel. */
+  async refresh(): Promise<void> {
+    await Promise.all(this.categories.map((c) => this.reload(c)));
+  }
+
+  duplicates(): DuplicateGroup[] {
+    return findDuplicates(this.items(), (it, col) => this.value(it, col));
+  }
+
+  /** Removes an item's row. The last row of a table is cleared instead, because a table keeps one row. */
+  async deleteItem(item: Item): Promise<void> {
+    const t = this.table(item.category);
+    const current = await g.readRow(t, item.index);
+    if (!sameRow(current, item.row)) throw new ChangedError();
+    if (t.rows.length === 1) await g.updateRow(t, item.index, t.headers.map(() => ''));
+    else await g.deleteRow(t, item.index);
+    await this.reload(item.category);
   }
 
   /** Numbers rows typed in Excel without an Item No and fills blank book details from ISBN. */

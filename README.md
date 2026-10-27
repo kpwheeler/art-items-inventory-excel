@@ -107,14 +107,19 @@ npm run build
 
 ## Using the form
 
-- **Add item:** pick a category, fill any fields, Save (the item number is assigned) or
-  Save & add another (keeps category and acquisition details).
+- **Add item:** choose the **Category** from the pull-down at the top of the form, fill any
+  fields, Save (the item number is assigned) or Save & add another (keeps category and
+  acquisition details).
 - **Books:** type the ISBN and tap *Look up*, or *Scan* the barcode with the camera. Only empty
   fields are filled.
 - **Search:** matches item number, name, creator, description, source, location, tags and notes.
   Tap a result to edit it.
-- **Move to category:** on an item's page, e.g. to sort something out of Misc. It gets a new
-  number; Notes records the old one.
+- **Move to another category:** on an item's page, choose a different Category in the pull-down,
+  e.g. to sort something out of Misc. It gets a new number; Notes records the old one.
+- **Check duplicates:** lists items that may have been entered more than once: same item number,
+  ISBN, serial number or name ("likely"), or very similar names ("possible"). Open each to compare,
+  and Delete the extra copy (asks first; OneDrive version history can undo).
+- **Close:** ends the session and releases the workbook; then close the tab. You stay signed in.
 - **Tidy workbook:** numbers rows typed in Excel without an Item No and fills blank book details
   from their ISBN.
 - If a row was changed in Excel after you opened it, the form asks before overwriting.
