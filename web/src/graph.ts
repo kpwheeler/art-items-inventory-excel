@@ -16,6 +16,13 @@ export interface TableData {
 
 let base = '';
 
+/** A Graph request that failed; `status` is the HTTP status (404 = not found). */
+export class GraphError extends Error {
+  constructor(readonly status: number, detail: string) {
+    super(`Excel request failed (${status}): ${detail}`);
+  }
+}
+
 export function setWorkbookPath(path: string): void {
   const p = path.startsWith('/') ? path : `/${path}`;
   base = `https://graph.microsoft.com/v1.0/me/drive/root:${encodeURI(p)}:/workbook`;
@@ -30,7 +37,7 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Excel request failed (${res.status}): ${text.slice(0, 300)}`);
+    throw new GraphError(res.status, text.slice(0, 300));
   }
   const type = res.headers.get('content-type') ?? '';
   return (type.includes('json') ? await res.json() : undefined) as T;

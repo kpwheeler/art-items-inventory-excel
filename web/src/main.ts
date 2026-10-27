@@ -1,6 +1,6 @@
 import './style.css';
 import { initAuth, signIn, signOut } from './auth';
-import { setWorkbookPath } from './graph';
+import { GraphError, setWorkbookPath } from './graph';
 import { bookFields, lookupIsbn } from './isbn';
 import {
   AUTO_COLUMNS, ChangedError, DATE_COLUMNS, LONG_COLUMNS, NUMBER_COLUMNS, Workbook,
@@ -312,7 +312,17 @@ async function start(): Promise<void> {
     h('button', { className: 'link', onclick: () => void signOut() }, 'Sign out'));
 
   show(message('Opening the workbook…'));
-  await wb.load();
+  try {
+    await wb.load();
+  } catch (e) {
+    if (e instanceof GraphError && e.status === 404) {
+      show(message(`Workbook not found in your OneDrive at "${config.workbookPath}".`, 'error'),
+        h('p', {}, 'Upload Collection Inventory.xlsx to that folder with that exact name, then reload this page. '
+          + 'If it is somewhere else, set the WORKBOOK_PATH repository variable to its path and redeploy.'));
+      return;
+    }
+    throw e;
+  }
   nav.hidden = false;
   nav.querySelectorAll<HTMLButtonElement>('button[data-view]').forEach((b) => {
     b.onclick = () => {
