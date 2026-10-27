@@ -46,17 +46,39 @@ because the query combines the workbook with a web source: choose **Public** for
 
 ### 2. Register the web form with Microsoft (one time, free)
 
-1. Sign in at <https://entra.microsoft.com> (or the Azure portal) with the Microsoft account that
-   owns the OneDrive. If it asks you to create a directory or free Azure account first, do that.
-2. **App registrations › New registration**
+A personal Microsoft account (Outlook.com, Microsoft 365 Personal/Family) has no Microsoft Entra
+directory of its own, and app registration needs one. Signing in to entra.microsoft.com with only a
+personal account fails or shows App registrations empty. A free Azure account creates the directory.
+
+**a. Create the directory (free Azure account)**
+
+1. Go to <https://azure.microsoft.com/free> and sign in with the Microsoft account that owns the
+   OneDrive holding the workbook.
+2. Complete the sign-up. Microsoft asks for a phone number and a card to verify identity; app
+   registration itself costs nothing and nothing needs to run in Azure.
+3. Sign out, then sign in at <https://entra.microsoft.com> with the same account. A
+   **Default Directory** now exists with you as administrator.
+
+**b. Register the app**
+
+1. **Applications › App registrations › New registration**
    - Name: `Collection Inventory`
-   - Supported account types: **Personal Microsoft accounts only**
-   - Redirect URI: platform **Single-page application**,
+   - Supported account types: **Personal Microsoft accounts only**. If that option isn't offered,
+     choose **Accounts in any organizational directory and personal Microsoft accounts**; the form
+     works with either.
+   - Redirect URI: platform **Single-page application (SPA)**,
      `https://kpwheeler.github.io/art-items-inventory-excel/`
-3. Under **Authentication**, add a second SPA redirect URI for local testing:
+2. **Authentication** › Single-page application › add a second redirect URI for local testing:
    `http://localhost:5173/art-items-inventory-excel/`
-4. Under **API permissions**, add Microsoft Graph › Delegated › `Files.ReadWrite`.
-5. Copy the **Application (client) ID**.
+3. **API permissions** › Add a permission › Microsoft Graph › Delegated › `Files.ReadWrite`.
+   (`User.Read` is already there; keep it.)
+4. **Overview** › copy the **Application (client) ID**. It is not a secret.
+
+The first time you sign in to the form, Microsoft asks you to allow it to read and write your files;
+accept once.
+
+If you'd rather not create an Azure account, the alternative is the spec's fallback without the
+custom form (Microsoft Forms or Excel-only entry); see docs/SPEC.md, Roadmap › Phase 0.
 
 ### 3. Configure and publish the form
 
