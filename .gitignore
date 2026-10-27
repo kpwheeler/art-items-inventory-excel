@@ -1,0 +1,22 @@
+# Personal planning files kept in the project folder but never published
+/Conversation Transcript*
+/Collection Inventory App - *
+/PostgreSQL*
+/*.pdf
+/*.zip
+
+# Secrets and local config
+.env*
+!.env.example
+web/public/config.json
+
+# Build output and dependencies
+node_modules/
+web/dist/
+
+# Excel lock and temp files
+~$*
+*.tmp
+
+# Local tool settings
+.claude/

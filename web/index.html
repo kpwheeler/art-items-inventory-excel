@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1f3f7f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Inventory" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <title>Collection Inventory</title>
+  </head>
+  <body>
+    <header class="top">
+      <h1>Collection Inventory</h1>
+      <div id="account"></div>
+    </header>
+    <nav id="nav" hidden>
+      <button data-view="add">Add item</button>
+      <button data-view="search">Search</button>
+      <button data-view="tidy">Tidy workbook</button>
+    </nav>
+    <main id="main"><p class="muted">Loading…</p></main>
+    <dialog id="scanner">
+      <p>Point the camera at the barcode on the back cover.</p>
+      <video id="scan-video" playsinline muted></video>
+      <button id="scan-cancel" type="button">Cancel</button>
+    </dialog>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
