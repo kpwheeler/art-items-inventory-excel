@@ -72,6 +72,16 @@ async function call<T>(method: string, url: string, body?: unknown, retry = meth
   }
 }
 
+/** Ends the Excel session so the workbook is released; changes are already saved. */
+export async function closeSession(): Promise<void> {
+  if (!session) return;
+  try {
+    await send('POST', '/closeSession', undefined, true);
+  } finally {
+    session = null;
+  }
+}
+
 async function openSession(): Promise<void> {
   for (let attempt = 1; ; attempt++) {
     const res = await send('POST', '/createSession', { persistChanges: true }, false);

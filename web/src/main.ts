@@ -1,6 +1,6 @@
 import './style.css';
 import { initAuth, signIn, signOut } from './auth';
-import { GraphError, setWorkbookPath } from './graph';
+import { closeSession, GraphError, setWorkbookPath } from './graph';
 import { bookFields, lookupIsbn } from './isbn';
 import {
   AUTO_COLUMNS, ChangedError, DATE_COLUMNS, LONG_COLUMNS, NUMBER_COLUMNS, Workbook,
@@ -55,7 +55,10 @@ interface ItemForm {
   fields(): Fields;
 }
 
-function buildForm(c: Category, values: Fields, onSubmit: (action: string) => Promise<void>, actions: [string, string][]): ItemForm {
+function buildForm(
+  c: Category, values: Fields, onSubmit: (action: string) => Promise<void>, actions: [string, string][],
+  lead?: HTMLElement,
+): ItemForm {
   const headers = wb.table(c).headers.filter((col) => !AUTO_COLUMNS.includes(col));
   const inputs = new Map<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>();
   const status = h('span', { className: 'muted' });
@@ -117,7 +120,7 @@ function buildForm(c: Category, values: Fields, onSubmit: (action: string) => Pr
   const units = inputs.get('Units');
   if (units && !values['Item No'] && !units.value) units.value = 'in';
 
-  const form = h('form', { className: 'item' }, ...rows,
+  const form = h('form', { className: 'item' }, lead, ...rows,
     h('div', { className: 'actions' },
       ...actions.map(([action, label], i) =>
         h('button', { type: 'submit', value: action, className: i === 0 ? 'primary' : '' }, label))));
@@ -179,10 +182,23 @@ function categoryPicker(selected: Category | undefined, onChange: (c: Category) 
   return select;
 }
 
+/** The Category pull-down shown as the first field of the item form. */
+function categoryField(selected: Category, onChange: (c: Category, select: HTMLSelectElement) => void): HTMLElement {
+  const select = h('select', { name: 'Category' },
+    ...wb.categories.map((c) => h('option', { value: c.name, selected: c === selected }, c.name)));
+  select.onchange = () => {
+    const c = wb.category(select.value);
+    if (c) onChange(c, select);
+  };
+  return h('label', { className: 'category' }, h('span', {}, 'Category'), select);
+}
+
 function showAdd(c: Category = wb.categories[0], keep: Fields = {}, note?: HTMLElement): void {
+  // Switching category keeps what was already typed in the fields the categories share.
+  const lead = categoryField(c, (next) => showAdd(next, form.fields()));
   const form = buildForm(c, keep, (action) => save(action), [
     ['save', 'Save'], ['again', 'Save & add another'],
-  ]);
+  ], lead);
   const save = async (action: string) => {
     const fields = form.fields();
     if (Object.entries(fields).every(([col, v]) => !v || col === 'Units')) {
@@ -204,8 +220,7 @@ function showAdd(c: Category = wb.categories[0], keep: Fields = {}, note?: HTMLE
       show(message(`Not saved: ${errorText(e)}`, 'error'), header, form.element);
     }
   };
-  const header = h('div', { className: 'bar' },
-    h('h2', {}, 'Add item'), categoryPicker(c, (next) => showAdd(next, keep)));
+  const header = h('h2', {}, 'Add item');
   show(note ?? null, header, form.element);
 }
 
@@ -214,7 +229,25 @@ function showEdit(item: Item, note?: HTMLElement): void {
   const values: Fields = {};
   for (const col of t.headers) values[col] = wb.value(item, col);
 
-  const form = buildForm(item.category, values, (action) => save(action, false), [['save', 'Save changes']]);
+  // Choosing another category moves the item to that tab (after confirming).
+  const lead = categoryField(item.category, (dest, select) => void move(dest, select));
+  const form = buildForm(item.category, values, (action) => save(action, false), [['save', 'Save changes']], lead);
+  const move = async (dest: Category, select: HTMLSelectElement) => {
+    if (!confirm(`Move ${values['Item No']} to ${dest.name}? It gets a new ${dest.prefix} item number; `
+      + 'unsaved changes on this page are not kept.')) {
+      select.value = item.category.name;
+      return;
+    }
+    select.disabled = true;
+    try {
+      const itemNo = await wb.moveItem(item, dest);
+      const moved = wb.find(itemNo);
+      const done = message(`Moved to ${dest.name} as ${itemNo}. Fill in its ${dest.name} fields below.`, 'ok');
+      if (moved) showEdit(moved, done); else showSearch();
+    } catch (e) {
+      show(message(`Not moved: ${errorText(e)}`, 'error'), header, form.element);
+    }
+  };
   const save = async (_action: string, force: boolean) => {
     try {
       await wb.updateItem(item, form.fields(), force);
@@ -225,34 +258,14 @@ function showEdit(item: Item, note?: HTMLElement): void {
         await save(_action, true);
         return;
       }
-      show(message(`Not saved: ${errorText(e)}`, 'error'), header, form.element, mover);
+      show(message(`Not saved: ${errorText(e)}`, 'error'), header, form.element);
     }
   };
-
-  const others = wb.categories.filter((c) => c !== item.category);
-  const target = h('select', {}, ...others.map((c) => h('option', { value: c.name }, c.name)));
-  const mover = h('div', { className: 'bar move' },
-    h('span', {}, 'Move to category'), target,
-    h('button', {
-      type: 'button',
-      onclick: async () => {
-        const dest = wb.category(target.value);
-        if (!dest || !confirm(`Move ${values['Item No']} to ${dest.name}? It gets a new item number.`)) return;
-        try {
-          const itemNo = await wb.moveItem(item, dest);
-          const moved = wb.find(itemNo);
-          const done = message(`Moved to ${dest.name} as ${itemNo}. Fill in its ${dest.name} fields below.`, 'ok');
-          if (moved) showEdit(moved, done); else showSearch();
-        } catch (e) {
-          show(message(`Not moved: ${errorText(e)}`, 'error'), header, form.element, mover);
-        }
-      },
-    }, 'Move'));
 
   const header = h('div', { className: 'bar' },
     h('h2', {}, `${values['Item No'] || 'Item'} · ${item.category.name}`),
     h('span', { className: 'muted' }, values['Last Updated'] ? `Updated ${values['Last Updated']}` : ''));
-  show(note ?? null, header, form.element, others.length ? mover : null);
+  show(note ?? null, header, form.element);
 }
 
 function showSearch(text = '', c?: Category): void {
@@ -299,6 +312,20 @@ function showTidy(): void {
     run, log);
 }
 
+async function closeApp(): Promise<void> {
+  if (main.querySelector('form.item') && !confirm('Close the inventory? Anything not saved on this page is lost.')) return;
+  nav.hidden = true;
+  show(message('Closing…'));
+  try {
+    await closeSession();
+  } catch {
+    // Nothing to lose: every save is already in the workbook.
+  }
+  show(message('Finished. Everything you saved is in the workbook. You can close this tab.', 'ok'),
+    h('button', { className: 'primary', onclick: () => window.location.reload() }, 'Open again'));
+  window.close();   // works only where Chrome allows a page to close itself
+}
+
 // ---------------------------------------------------------------- start-up
 
 async function start(): Promise<void> {
@@ -339,6 +366,7 @@ async function start(): Promise<void> {
     b.onclick = () => {
       if (b.dataset.view === 'add') showAdd();
       else if (b.dataset.view === 'search') showSearch();
+      else if (b.dataset.view === 'close') void closeApp();
       else showTidy();
     };
   });
