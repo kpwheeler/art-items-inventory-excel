@@ -35,9 +35,12 @@ jobs:
         env:
           CLIENT_ID: ${{ vars.CLIENT_ID }}
           AUTHORITY: ${{ vars.AUTHORITY || 'https://login.microsoftonline.com/consumers' }}
-          WORKBOOK_PATH: ${{ vars.WORKBOOK_PATH || '/Inventory/Collection Inventory.xlsx' }}
+          # appFolder = only OneDrive > Apps > <app name> (path inside that folder);
+          # allFiles = whole OneDrive (path from the top), the broader fallback.
+          ACCESS: ${{ vars.ACCESS || 'appFolder' }}
+          WORKBOOK_PATH: ${{ vars.WORKBOOK_PATH || '/Collection Inventory.xlsx' }}
         run: |
-          node -e "require('fs').writeFileSync('public/config.json', JSON.stringify({clientId: process.env.CLIENT_ID || '', authority: process.env.AUTHORITY, workbookPath: process.env.WORKBOOK_PATH}, null, 2))"
+          node -e "require('fs').writeFileSync('public/config.json', JSON.stringify({clientId: process.env.CLIENT_ID || '', authority: process.env.AUTHORITY, access: process.env.ACCESS, workbookPath: process.env.WORKBOOK_PATH}, null, 2))"
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

@@ -1,6 +1,6 @@
 import './style.css';
 import { initAuth, signIn, signOut } from './auth';
-import { closeSession, GraphError, setWorkbookPath } from './graph';
+import { closeSession, ensureAppFolder, GraphError, setWorkbook, type Access } from './graph';
 import { bookFields, lookupIsbn } from './isbn';
 import {
   AUTO_COLUMNS, ChangedError, DATE_COLUMNS, LONG_COLUMNS, NUMBER_COLUMNS, Workbook,
@@ -10,7 +10,10 @@ import {
 interface Config {
   clientId: string;
   authority: string;
+  /** Inside the app folder when access is 'appFolder', else from the top of OneDrive. */
   workbookPath: string;
+  /** Defaults to 'appFolder', the narrow permission. */
+  access?: Access;
 }
 
 const main = document.getElementById('main') as HTMLElement;
@@ -389,8 +392,10 @@ async function start(): Promise<void> {
     return;
   }
 
-  setWorkbookPath(config.workbookPath);
-  const account = await initAuth(config.clientId, config.authority);
+  const access: Access = config.access ?? 'appFolder';
+  setWorkbook(config.workbookPath, access);
+  const account = await initAuth(config.clientId, config.authority,
+    [access === 'appFolder' ? 'Files.ReadWrite.AppFolder' : 'Files.ReadWrite']);
   if (!account) {
     show(h('p', {}, 'Sign in with the Microsoft account whose OneDrive holds the workbook.'),
       h('button', { className: 'primary', onclick: () => void signIn() }, 'Sign in with Microsoft'));
@@ -400,13 +405,19 @@ async function start(): Promise<void> {
     h('button', { className: 'link', onclick: () => void signOut() }, 'Sign out'));
 
   show(message('Opening the workbook…'));
+  const file = config.workbookPath.replace(/^.*\//, '');
+  // With the narrow permission the form can only see its own folder, which Microsoft creates
+  // (named after the app registration) the first time it is used.
+  const where = access === 'appFolder'
+    ? `OneDrive › Apps › ${await ensureAppFolder()}`
+    : `OneDrive at "${config.workbookPath}"`;
   try {
     await wb.load();
   } catch (e) {
     if (e instanceof GraphError && e.status === 404) {
-      show(message(`Workbook not found in your OneDrive at "${config.workbookPath}".`, 'error'),
-        h('p', {}, 'Upload Collection Inventory.xlsx to that folder with that exact name, then reload this page. '
-          + 'If it is somewhere else, set the WORKBOOK_PATH repository variable to its path and redeploy.'));
+      show(message(`Workbook not found in ${where}.`, 'error'),
+        h('p', {}, `Move ${file} into that folder (OneDrive on the web, or File Explorer), keeping its name, `
+          + 'then reload this page. This form can only see files in that folder.'));
       return;
     }
     throw e;

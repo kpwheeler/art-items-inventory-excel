@@ -30,9 +30,10 @@ The workbook is the database; the web form and Excel are two windows onto the sa
 
 ## Workbook design
 
-`Collection Inventory.xlsx` lives in OneDrive at **Inventory/Collection Inventory.xlsx** (a top-level
-folder named Inventory, which also holds reference copies of this specification and the setup guide)
-and holds one Excel Table per category tab. Every
+`Collection Inventory.xlsx` lives in OneDrive at **Apps › Inventory › Collection Inventory.xlsx**, the
+form's own app folder and the only folder it can reach (see Security below). The top-level OneDrive
+folder named Inventory keeps reference copies of this specification and the setup guide. The
+workbook holds one Excel Table per category tab. Every
 category table starts with the same shared columns, in the same order, followed by its own columns.
 
 ### Worksheet tabs
@@ -152,7 +153,16 @@ by name, with a match count and total estimated value. One formula (`LET`, `VSTA
 4. Add the table to the Search formula in `Search!A11`.
 
 OneDrive keeps version history; save an offline copy now and then. The workbook stays private in
-OneDrive; the form reaches it only after sign-in (Graph scope `Files.ReadWrite`) and holds no secrets.
+OneDrive; the form reaches it only after sign-in and holds no secrets.
+
+**Security: least privilege.** The form signs in with Microsoft Graph `Files.ReadWrite.AppFolder`,
+which allows reading and writing only the app's own folder, OneDrive › Apps › Inventory (named after
+the app registration "Inventory"). The rest of the OneDrive, including tax, banking, medical and
+legal folders, is out of reach, so a stolen token cannot expose it. Personal Microsoft accounts have
+no permission for a folder of the owner's choosing; the app folder is the narrowest available. Any
+earlier consent to `Files.ReadWrite` is removed at account.live.com/consent/Manage. Microsoft
+documents the Excel workbook API with `Files.ReadWrite`; if it refuses the app-folder permission,
+the repository variable `ACCESS=allFiles` restores full access without a code change.
 
 ## Costs
 
@@ -175,8 +185,9 @@ OneDrive; the form reaches it only after sign-in (Graph scope `Files.ReadWrite`)
 | Barcode scanning | Yes, Phase 2 |
 | Currency and units | USD, inches |
 | GitHub repository | `kpwheeler/art-items-inventory-excel` (public) |
-| Workbook location | OneDrive › Inventory › Collection Inventory.xlsx |
-| App registration | A personal Microsoft account has no Microsoft Entra directory, so a free Azure account was created to get one. App "Collection Inventory", personal accounts, SPA redirect `https://kpwheeler.github.io/art-items-inventory-excel/`, Graph `Files.ReadWrite` |
+| Workbook location | OneDrive › Apps › Inventory › Collection Inventory.xlsx (the form's app folder); reference documents stay in OneDrive › Inventory |
+| Form's access to OneDrive | Only its app folder (`Files.ReadWrite.AppFolder`), not all files |
+| App registration | A personal Microsoft account has no Microsoft Entra directory, so a free Azure account was created to get one. App "Inventory", personal accounts, SPA redirect `https://kpwheeler.github.io/art-items-inventory-excel/`, Graph `Files.ReadWrite.AppFolder` |
 | Target browser | Google Chrome on Windows and iPhone |
 
 ## Roadmap
@@ -197,7 +208,9 @@ OneDrive; the form reaches it only after sign-in (Graph scope `Files.ReadWrite`)
   workbook copies them into blank Books cells.
 - **Lists tab adds `tblDropdowns`** (column → list) so the form offers exactly the sheet's dropdowns.
 - **Tidy workbook and change warnings** (Phase 3 items) were built early, with the form.
-- **Workbook moved to OneDrive › Inventory** instead of Documents, at the owner's request.
+- **Workbook moved to OneDrive › Inventory** instead of Documents, at the owner's request, then to
+  **OneDrive › Apps › Inventory** so the form could use the app-folder permission instead of access to
+  all files (security review, 2026-10-27).
 - **Category is a pull-down at the top of the form**, and moving an item is done by changing it,
   replacing the separate "Move to category" control.
 - **Added after the spec:** the Close button, the Check duplicates page, and the single Excel session

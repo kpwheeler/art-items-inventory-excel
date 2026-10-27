@@ -14,6 +14,9 @@
 - Lookups (ISBN) and tidy-ups only fill blank cells. They never overwrite what the user typed.
 - Categories, dropdown lists and their columns come from the workbook (`tblCategories`,
   `tblDropdowns`); the form must not hard-code them.
+- Least privilege: the form signs in with `Files.ReadWrite.AppFolder` and opens the workbook inside
+  its own app folder (OneDrive › Apps › Inventory, named after the app registration). `allFiles`
+  (`Files.ReadWrite`) is a configured fallback only, never the default.
 - No secrets in the repo. The Microsoft app (client) ID and workbook path are configuration, not
   secrets: `web/public/config.json` locally (git-ignored), repository variables in CI.
 - Target browser: Google Chrome on Windows and iPhone. Barcode scanning uses ZXing because Chrome

@@ -38,9 +38,9 @@ Use the committed `workbook/Collection Inventory.xlsx`, or rebuild it (Windows, 
 & .\workbook\build-workbook.ps1
 ```
 
-Put it in OneDrive at **Inventory/Collection Inventory.xlsx** (a folder named `Inventory` at the top
-level of OneDrive). That is where the form opens it; keep the file name. The same folder is a good
-place for reference copies of this guide and the specification.
+The form keeps the workbook in **OneDrive › Apps › Inventory**, the only folder it is allowed to
+reach (see *Why the Apps folder* below). Microsoft creates that folder the first time you sign in
+to the form, so you move the workbook there in step 4. Keep the file name `Collection Inventory.xlsx`.
 
 **First ISBN refresh (Excel desktop):** Data › Refresh All. Excel asks once for privacy levels
 because the query combines the workbook with a web source: choose **Public** for openlibrary.org
@@ -64,7 +64,9 @@ personal account fails or shows App registrations empty. A free Azure account cr
 **b. Register the app**
 
 1. **Applications › App registrations › New registration**
-   - Name: `Collection Inventory`
+   - Name: `Inventory`. This name becomes the form's OneDrive folder, **Apps › Inventory**. (An
+     existing registration can be renamed under **Branding & properties**, before the first
+     sign-in that creates the folder.)
    - Supported account types: **Personal Microsoft accounts only**. If that option isn't offered,
      choose **Accounts in any organizational directory and personal Microsoft accounts**; the form
      works with either.
@@ -72,11 +74,12 @@ personal account fails or shows App registrations empty. A free Azure account cr
      `https://kpwheeler.github.io/art-items-inventory-excel/`
 2. **Authentication** › Single-page application › add a second redirect URI for local testing:
    `http://localhost:5173/art-items-inventory-excel/`
-3. **API permissions** › Add a permission › Microsoft Graph › Delegated › `Files.ReadWrite`.
-   (`User.Read` is already there; keep it.)
+3. **API permissions** › Add a permission › Microsoft Graph › Delegated ›
+   `Files.ReadWrite.AppFolder`. Do **not** add `Files.ReadWrite` (all files); if it is listed,
+   remove it. (`User.Read` is already there; keep it.)
 4. **Overview** › copy the **Application (client) ID**. It is not a secret.
 
-The first time you sign in to the form, Microsoft asks you to allow it to read and write your files;
+The first time you sign in to the form, Microsoft asks you to allow it to use its own app folder;
 accept once.
 
 If you'd rather not create an Azure account, the alternative is the spec's fallback without the
@@ -89,11 +92,36 @@ In this GitHub repository: Settings › Secrets and variables › Actions › **
 | Variable | Value |
 | --- | --- |
 | `CLIENT_ID` | the Application (client) ID from step 2 |
-| `WORKBOOK_PATH` | `/Inventory/Collection Inventory.xlsx` (also the default when unset) |
+| `ACCESS` | optional; `appFolder` (default) or `allFiles` (see below) |
+| `WORKBOOK_PATH` | optional; default `/Collection Inventory.xlsx`, inside the app folder |
 
 Then Actions › *Deploy web form to GitHub Pages* › Run workflow. The form is published at
 <https://kpwheeler.github.io/art-items-inventory-excel/>. On iPhone, open it in Chrome and use
 Share › Add to Home Screen.
+
+### 4. First sign-in and moving the workbook in
+
+1. Open the form, sign in, and accept the permission prompt. The form creates
+   **OneDrive › Apps › Inventory** and reports "Workbook not found in OneDrive › Apps › Inventory".
+2. Move `Collection Inventory.xlsx` into that folder (OneDrive on the web, or File Explorer under
+   OneDrive › Apps › Inventory). Keep the name.
+3. Reload the form.
+
+### Why the Apps folder
+
+The form signs in with `Files.ReadWrite.AppFolder`, which lets it read and write **only** its own
+folder, OneDrive › Apps › Inventory. Your other OneDrive files (taxes, banking, medical, legal) are
+out of its reach, so a stolen sign-in token could not expose them. Microsoft has no permission for a
+folder you pick yourself on a personal account; the app folder is the narrowest available.
+
+If an app was ever granted the broader `Files.ReadWrite`, that consent stays on your account until
+removed: open <https://account.live.com/consent/Manage>, choose the app, and **Remove these
+permissions**, then sign in to the form again.
+
+Microsoft documents the Excel workbook API with the all-files permission only. If Excel refuses to
+open the workbook through the app folder, set the repository variable `ACCESS` to `allFiles` and
+`WORKBOOK_PATH` to the workbook's path from the top of OneDrive (for example
+`/Inventory/Collection Inventory.xlsx`), and redeploy. That restores full-OneDrive access.
 
 ### Local development
 

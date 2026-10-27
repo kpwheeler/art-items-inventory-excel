@@ -4,13 +4,15 @@ import {
   type AccountInfo,
 } from '@azure/msal-browser';
 
-// Read and write the signed-in user's own OneDrive files; nothing else.
-const SCOPES = ['Files.ReadWrite'];
+// Set by initAuth: 'Files.ReadWrite.AppFolder' (only the app's own OneDrive folder) or,
+// as a fallback, 'Files.ReadWrite' (all of the user's files).
+let SCOPES: string[] = [];
 
 let pca: PublicClientApplication;
 let account: AccountInfo | null = null;
 
-export async function initAuth(clientId: string, authority: string): Promise<AccountInfo | null> {
+export async function initAuth(clientId: string, authority: string, scopes: string[]): Promise<AccountInfo | null> {
+  SCOPES = scopes;
   pca = new PublicClientApplication({
     auth: {
       clientId,

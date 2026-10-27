@@ -23,9 +23,28 @@ export class GraphError extends Error {
   }
 }
 
-export function setWorkbookPath(path: string): void {
+/**
+ * 'appFolder': the workbook path is inside the app's own folder (OneDrive › Apps › <app name>),
+ * the only folder the narrow Files.ReadWrite.AppFolder permission can reach.
+ * 'allFiles': the path is from the top of OneDrive and needs Files.ReadWrite (all files).
+ */
+export type Access = 'appFolder' | 'allFiles';
+
+let folderUrl = '';
+
+export function setWorkbook(path: string, access: Access): void {
   const p = path.startsWith('/') ? path : `/${path}`;
-  base = `https://graph.microsoft.com/v1.0/me/drive/root:${encodeURI(p)}:/workbook`;
+  folderUrl = access === 'appFolder'
+    ? 'https://graph.microsoft.com/v1.0/me/drive/special/approot'
+    : 'https://graph.microsoft.com/v1.0/me/drive/root';
+  base = `${folderUrl}:${encodeURI(p)}:/workbook`;
+}
+
+/** Returns the name of the app's folder, which Microsoft creates under OneDrive › Apps on first use. */
+export async function ensureAppFolder(): Promise<string> {
+  const res = await fetch(folderUrl, { headers: { Authorization: `Bearer ${await getToken()}` } });
+  if (!res.ok) throw new GraphError(res.status, (await res.text()).slice(0, 300));
+  return ((await res.json()) as { name: string }).name;
 }
 
 // One Excel session for all requests: the workbook is opened once instead of on every call,

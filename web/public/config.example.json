@@ -1,5 +1,6 @@
 {
   "clientId": "00000000-0000-0000-0000-000000000000",
   "authority": "https://login.microsoftonline.com/consumers",
-  "workbookPath": "/Inventory/Collection Inventory.xlsx"
+  "access": "appFolder",
+  "workbookPath": "/Collection Inventory.xlsx"
 }
