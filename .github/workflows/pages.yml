@@ -35,7 +35,7 @@ jobs:
         env:
           CLIENT_ID: ${{ vars.CLIENT_ID }}
           AUTHORITY: ${{ vars.AUTHORITY || 'https://login.microsoftonline.com/consumers' }}
-          WORKBOOK_PATH: ${{ vars.WORKBOOK_PATH || '/Documents/Collection Inventory.xlsx' }}
+          WORKBOOK_PATH: ${{ vars.WORKBOOK_PATH || '/Inventory/Collection Inventory.xlsx' }}
         run: |
           node -e "require('fs').writeFileSync('public/config.json', JSON.stringify({clientId: process.env.CLIENT_ID || '', authority: process.env.AUTHORITY, workbookPath: process.env.WORKBOOK_PATH}, null, 2))"
       - run: npm run build

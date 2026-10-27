@@ -38,7 +38,9 @@ Use the committed `workbook/Collection Inventory.xlsx`, or rebuild it (Windows, 
 & .\workbook\build-workbook.ps1
 ```
 
-Upload it to OneDrive. The default location the form expects is `Documents/Collection Inventory.xlsx`.
+Put it in OneDrive at **Inventory/Collection Inventory.xlsx** (a folder named `Inventory` at the top
+level of OneDrive). That is where the form opens it; keep the file name. The same folder is a good
+place for reference copies of this guide and the specification.
 
 **First ISBN refresh (Excel desktop):** Data › Refresh All. Excel asks once for privacy levels
 because the query combines the workbook with a web source: choose **Public** for openlibrary.org
@@ -87,7 +89,7 @@ In this GitHub repository: Settings › Secrets and variables › Actions › **
 | Variable | Value |
 | --- | --- |
 | `CLIENT_ID` | the Application (client) ID from step 2 |
-| `WORKBOOK_PATH` | optional; default `/Documents/Collection Inventory.xlsx` |
+| `WORKBOOK_PATH` | `/Inventory/Collection Inventory.xlsx` (also the default when unset) |
 
 Then Actions › *Deploy web form to GitHub Pages* › Run workflow. The form is published at
 <https://kpwheeler.github.io/art-items-inventory-excel/>. On iPhone, open it in Chrome and use
